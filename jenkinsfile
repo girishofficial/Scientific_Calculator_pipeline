@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+    triggers {
+        githubPush()
+    }
+    environment {
+        DOCKER_IMAGE_NAME = 'sc-calculator'
+        GITHUB_REPO_URL = 'https://github.com/girishofficial/Scientific_Calculator_pipeline.git'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main', url: "${GITHUB_REPO_URL}"
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    // Download JUnit standalone JAR
+                    sh 'wget -q https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/1.9.2/junit-platform-console-standalone-1.9.2.jar -O junit.jar'
+
+                    // Compile Java classes with JUnit
+                    sh 'javac -cp "junit.jar:." Scientific_Calculator_pipeline/*.java'
+
+                    // Run JUnit tests and fail pipeline on test failure
+                    sh 'java -cp "junit.jar:.:" org.junit.platform.console.ConsoleLauncher --classpath "Scientific_Calculator_pipeline" --select-class Scientific_Calculator_pipeline.ScientificCalculatorTest --fail-if-no-tests || exit 1'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ${DOCKER_IMAGE_NAME} .'
+            }
+        }
+
+        stage('Push Docker Images') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'DockerHubCred', variable: 'DOCKER_HUB_PASSWORD')]) {
+                        sh 'docker tag ${DOCKER_IMAGE_NAME} girish445g/${DOCKER_IMAGE_NAME}:latest'
+                        sh 'docker push girish445g/${DOCKER_IMAGE_NAME}:latest'
+                    }
+                }
+            }
+        }
+
+        stage('Run Ansible Playbook') {
+            steps {
+                script {
+                    withCredentials([
+                        string(credentialsId: 'LOCALPASS', variable: 'ANSIBLE_BECOME_PASS'),
+                        string(credentialsId: 'LOCALPASS', variable: 'ANSIBLE_SSH_PASS')
+                    ]) {
+                        sh '''
+                        ansible-playbook -i inventory.ini deploy.yml --extra-vars "ansible_become_pass=${ANSIBLE_BECOME_PASS} ansible_ssh_pass=${ANSIBLE_SSH_PASS}"
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
