@@ -12,7 +12,7 @@ public class ScientificCalculatorTest {
 
     @Test
     void testCalculateSquareRoot() {
-        assertEquals(6.0, ScientificCalculator.calculateSquareRoot(25), 0.0001);
+        assertEquals(5.0, ScientificCalculator.calculateSquareRoot(25), 0.0001);
         assertEquals(3.1622, ScientificCalculator.calculateSquareRoot(10), 0.0001);
     }
 
